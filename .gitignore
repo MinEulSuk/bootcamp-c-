@@ -1,3 +1,10 @@
 .vs/
-Project/
 packages/
+Project.sln
+Project/bin
+Project/obj
+Project/Properties
+Project/App.config
+Project/Form1.resx
+Project/Project.csproj
+Project/packages.config
