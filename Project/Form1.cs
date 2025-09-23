@@ -7,6 +7,8 @@ using System.Drawing;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Media; // Brushes 사용을 위해 추가
+using System.Windows.Threading;
+using Color = System.Drawing.Color;
 
 namespace Project
 {
@@ -155,71 +157,71 @@ namespace Project
                 DustValues.RemoveAt(0);
                 CO2Values.RemoveAt(0);
             }
-            CheckAllStatuses();
+            //CheckAllStatuses();
         }
 
-        private void CheckAllStatuses()
-        {
-            // --- 온도 감시 (기준: 22.5 ~ 23.5°C) ---
-            double currentTemp = TempValues[TempValues.Count - 1]; // 가장 최신 값
-            if (currentTemp < 22.5 || currentTemp > 23.5)
-            {
-                panel1.BackColor = Color.IndianRed; // 배경색 변경
-                label_TempStatus.Text = "상태: 온도 이탈!";
-                label_TempStatus.ForeColor = Color.White;
-            }
-            else
-            {
-                panel1.BackColor = SystemColors.Control; // 원래 배경색
-                label_TempStatus.Text = "상태: 정상";
-                label_TempStatus.ForeColor = Color.Black;
-            }
+        //private void CheckAllStatuses()
+        //{
+        //    // --- 온도 감시 (기준: 22.5 ~ 23.5°C) ---
+        //    double currentTemp = TempValues[TempValues.Count - 1]; // 가장 최신 값
+        //    if (currentTemp < 22.5 || currentTemp > 23.5)
+        //    {
+        //        panel1.BackColor = Color.IndianRed; // 배경색 변경
+        //        label_TempStatus.Text = "상태: 온도 이탈!";
+        //        label_TempStatus.ForeColor = System.Drawing.Color.White;
+        //    }
+        //    else
+        //    {
+        //        panel1.BackColor = SystemColors.Control; // 원래 배경색
+        //        label_TempStatus.Text = "상태: 정상";
+        //        label_TempStatus.ForeColor = System.Drawing.Color.Black;
+        //    }
 
-            // --- 습도 감시 (기준: 40 ~ 50%) ---
-            double currentHumidity = HumidityValues[HumidityValues.Count - 1];
-            if (currentHumidity < 40 || currentHumidity > 50)
-            {
-                panel2.BackColor = Color.IndianRed;
-                label_HumidityStatus.Text = "상태: 습도 이탈!";
-                label_HumidityStatus.ForeColor = Color.White;
-            }
-            else
-            {
-                panel2.BackColor = SystemColors.Control;
-                label_HumidityStatus.Text = "상태: 정상";
-                label_HumidityStatus.ForeColor = Color.Black;
-            }
+        //    // --- 습도 감시 (기준: 40 ~ 50%) ---
+        //    double currentHumidity = HumidityValues[HumidityValues.Count - 1];
+        //    if (currentHumidity < 40 || currentHumidity > 50)
+        //    {
+        //        panel2.BackColor = Color.IndianRed;
+        //        label_HumidityStatus.Text = "상태: 습도 이탈!";
+        //        label_HumidityStatus.ForeColor = Color.White;
+        //    }
+        //    else
+        //    {
+        //        panel2.BackColor = SystemColors.Control;
+        //        label_HumidityStatus.Text = "상태: 정상";
+        //        label_HumidityStatus.ForeColor = Color.Black;
+        //    }
 
-            // --- 미세먼지 감시 (기준: 1000개 미만) ---
-            double currentDust = DustValues[DustValues.Count - 1];
-            if (currentDust >= 1000)
-            {
-                panel3.BackColor = Color.IndianRed;
-                label_DustStatus.Text = "상태: 미세먼지 초과!";
-                label_DustStatus.ForeColor = Color.White;
-            }
-            else
-            {
-                panel3.BackColor = SystemColors.Control;
-                label_DustStatus.Text = "상태: 정상";
-                label_DustStatus.ForeColor = Color.Black;
-            }
+        //    // --- 미세먼지 감시 (기준: 1000개 미만) ---
+        //    double currentDust = DustValues[DustValues.Count - 1];
+        //    if (currentDust >= 1000)
+        //    {
+        //        panel3.BackColor = Color.IndianRed;
+        //        label_DustStatus.Text = "상태: 미세먼지 초과!";
+        //        label_DustStatus.ForeColor = Color.White;
+        //    }
+        //    else
+        //    {
+        //        panel3.BackColor = SystemColors.Control;
+        //        label_DustStatus.Text = "상태: 정상";
+        //        label_DustStatus.ForeColor = Color.Black;
+        //    }
 
-            // --- 이산화탄소 감시 (기준: 1000ppm 미만) ---
-            double currentCO2 = CO2Values[CO2Values.Count - 1];
-            if (currentCO2 >= 1000)
-            {
-                panel4.BackColor = Color.IndianRed;
-                label_CO2Status.Text = "상태: CO2 초과!";
-                label_CO2Status.ForeColor = Color.White;
-            }
-            else
-            {
-                panel4.BackColor = SystemColors.Control;
-                label_CO2Status.Text = "상태: 정상";
-                label_CO2Status.ForeColor = Color.Black;
-            }
-        }
+        //    // --- 이산화탄소 감시 (기준: 1000ppm 미만) ---
+        //    double currentCO2 = CO2Values[CO2Values.Count - 1];
+        //    if (currentCO2 >= 1000)
+        //    {
+        //        panel4.BackColor = Color.IndianRed;
+        //        label_CO2Status.Text = "상태: CO2 초과!";
+        //        label_CO2Status.ForeColor = Color.White;
+        //    }
+        //    else
+        //    {
+        //        panel4.BackColor = SystemColors.Control;
+        //        label_CO2Status.Text = "상태: 정상";
+        //        label_CO2Status.ForeColor = Color.Black;
+        //    }
+        //}
 
         private void Form1_Load(object sender, EventArgs e)
         {
