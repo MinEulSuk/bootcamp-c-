@@ -4,11 +4,13 @@ using LiveCharts.Wpf;
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Media; // Brushes 사용을 위해 추가
 using System.Windows.Threading;
 using Color = System.Drawing.Color;
+using System.Data.SQLite;
 
 namespace Project
 {
@@ -16,16 +18,29 @@ namespace Project
     {
         private Timer _timer;
         private Random _random = new Random();
+        private DatabaseManager _dbManager; // DB 호출용 매니저
 
         // 모든 차트가 공유할 마스터 데이터 소스
         public ChartValues<double> TempValues { get; set; }
         public ChartValues<double> HumidityValues { get; set; }
         public ChartValues<double> DustValues { get; set; }
         public ChartValues<double> CO2Values { get; set; }
-
         public Form1()
         {
             InitializeComponent();
+            // db 매니저 초기화
+            try
+            {
+                // 이 경로는 네 실제 DB 파일 위치에 맞게 수정해야 한다.
+                _dbManager = new DatabaseManager("sensor_database.db");
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(ex.Message);
+                Environment.Exit(1);
+
+            }
+
 
             // 마스터 데이터 소스 초기화
             TempValues = new ChartValues<double>();
@@ -136,6 +151,8 @@ namespace Project
 
         private void Timer_Tick(object sender, EventArgs e)
         {
+            SensorData data = _dbManager.GetLatestSensorData();
+
             // 실시간 데이터 시뮬레이션
             double temp = 23 + (_random.NextDouble() - 0.5) * 1.5;
             double humidity = 45 + (_random.NextDouble() - 0.5) * 10;
