@@ -31,7 +31,7 @@ namespace Project
             // db 매니저 초기화
             try
             {
-                // 이 경로는 네 실제 DB 파일 위치에 맞게 수정해야 한다.
+                // db 경로 설정
                 _dbManager = new DatabaseManager("sensor_database.db");
             }
             catch (Exception ex)
@@ -242,7 +242,6 @@ namespace Project
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            // 제목
             AddChartTitles();
         }
 

@@ -22,7 +22,6 @@ namespace Project
             connectionString = $"Data Source={dbFilePath};Version=3;";
         }
 
-        // 이 메서드는 DatabaseManager 클래스 안에 있어야 한다!
         public SensorData GetLatestSensorData()
         {
             SensorData latestData = null;
