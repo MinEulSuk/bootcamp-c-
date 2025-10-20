@@ -19,6 +19,8 @@ namespace Project
         private Timer _timer;
         private Random _random = new Random();
         private DatabaseManager _dbManager; // DB 호출용 매니저
+        private HardwareController _hardwareController;
+
 
         // 모든 차트가 공유할 마스터 데이터 소스
         public ChartValues<double> TempValues { get; set; }
@@ -29,6 +31,16 @@ namespace Project
         {
             InitializeComponent();
             // db 매니저 초기화
+            try
+            {
+                // "COM8"과 115200은 네 ESP32의 실제 포트와 통신 속도로 바꿔라.
+                _hardwareController = new HardwareController("COM8", 115200);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("장비 제어 포트 연결 실패: " + ex.Message);
+            }
+
             try
             {
                 // db 경로 설정
@@ -53,7 +65,7 @@ namespace Project
 
 
             // 실시간 시뮬레이션 시작
-            _timer = new Timer { Interval = 2000 };
+            _timer = new Timer { Interval = 1000 };
             _timer.Tick += Timer_Tick;
             _timer.Start();
         }
@@ -335,5 +347,12 @@ namespace Project
         {
 
         }
+
+        private void btnFanOn_Click(object sender, EventArgs e)
+        {
+
+        }
+
+
     }
 }
