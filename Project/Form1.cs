@@ -350,9 +350,16 @@ namespace Project
 
         private void btnFanOn_Click(object sender, EventArgs e)
         {
-
+            _hardwareController?.TurnFanOn();
         }
 
-
+        private void btnFanOff_Click(object sender, EventArgs e)
+        {
+            _hardwareController?.TurnFanOff();
+        }
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            _hardwareController?.Dispose(); // 사용 끝난 COM 포트 자원 반납
+        }
     }
 }

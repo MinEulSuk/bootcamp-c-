@@ -277,7 +277,7 @@
             this.btnFanOff.TabIndex = 11;
             this.btnFanOff.Text = "팬 끄기";
             this.btnFanOff.UseVisualStyleBackColor = true;
-//            this.btnFanOff.Click += new System.EventHandler(this.button3_Click);
+            this.btnFanOff.Click += new System.EventHandler(this.btnFanOff_Click);
             // 
             // btnFanOn
             // 
@@ -353,6 +353,7 @@
             this.Controls.Add(this.tabControl1);
             this.Name = "Form1";
             this.Text = "클린룸 통합 모니터링";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.tabControl1.ResumeLayout(false);
             this.tabPage_Overall.ResumeLayout(false);
