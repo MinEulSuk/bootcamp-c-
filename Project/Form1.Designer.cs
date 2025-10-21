@@ -37,8 +37,6 @@
             this.tabPage_CO2 = new System.Windows.Forms.TabPage();
             this.chart_Detail_CO2 = new LiveCharts.WinForms.CartesianChart();
             this.tabPage_Settings = new System.Windows.Forms.TabPage();
-            this.btnFanOff = new System.Windows.Forms.Button();
-            this.btnFanOn = new System.Windows.Forms.Button();
             this.btnColorChange = new System.Windows.Forms.Button();
             this.checkBox1 = new System.Windows.Forms.CheckBox();
             this.btnApplyChanges = new System.Windows.Forms.Button();
@@ -253,8 +251,6 @@
             // 
             // tabPage_Settings
             // 
-            this.tabPage_Settings.Controls.Add(this.btnFanOff);
-            this.tabPage_Settings.Controls.Add(this.btnFanOn);
             this.tabPage_Settings.Controls.Add(this.btnColorChange);
             this.tabPage_Settings.Controls.Add(this.checkBox1);
             this.tabPage_Settings.Controls.Add(this.btnApplyChanges);
@@ -268,26 +264,6 @@
             this.tabPage_Settings.TabIndex = 5;
             this.tabPage_Settings.Text = "환경설정";
             this.tabPage_Settings.UseVisualStyleBackColor = true;
-            // 
-            // btnFanOff
-            // 
-            this.btnFanOff.Location = new System.Drawing.Point(169, 149);
-            this.btnFanOff.Name = "btnFanOff";
-            this.btnFanOff.Size = new System.Drawing.Size(75, 23);
-            this.btnFanOff.TabIndex = 11;
-            this.btnFanOff.Text = "팬 끄기";
-            this.btnFanOff.UseVisualStyleBackColor = true;
-            this.btnFanOff.Click += new System.EventHandler(this.btnFanOff_Click);
-            // 
-            // btnFanOn
-            // 
-            this.btnFanOn.Location = new System.Drawing.Point(31, 149);
-            this.btnFanOn.Name = "btnFanOn";
-            this.btnFanOn.Size = new System.Drawing.Size(75, 23);
-            this.btnFanOn.TabIndex = 10;
-            this.btnFanOn.Text = "팬 켜기";
-            this.btnFanOn.UseVisualStyleBackColor = true;
-            this.btnFanOn.Click += new System.EventHandler(this.btnFanOn_Click);
             // 
             // btnColorChange
             // 
@@ -329,7 +305,7 @@
             this.label1.Size = new System.Drawing.Size(69, 12);
             this.label1.TabIndex = 1;
             this.label1.Text = "그래프 설정";
-            this.label1.Click += new System.EventHandler(this.label1_Click);
+//            this.label1.Click += new System.EventHandler(this.label1_Click);
             // 
             // cmbTargetChart
             // 
@@ -353,7 +329,7 @@
             this.Controls.Add(this.tabControl1);
             this.Name = "Form1";
             this.Text = "클린룸 통합 모니터링";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
+//            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.tabControl1.ResumeLayout(false);
             this.tabPage_Overall.ResumeLayout(false);
@@ -400,7 +376,5 @@
         private System.Windows.Forms.Button btnApplyChanges;
         private System.Windows.Forms.Button btnColorChange;
         private System.Windows.Forms.ColorDialog colorDialog1;
-        private System.Windows.Forms.Button btnFanOff;
-        private System.Windows.Forms.Button btnFanOn;
     }
 }
