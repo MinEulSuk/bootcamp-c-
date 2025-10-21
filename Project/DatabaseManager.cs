@@ -58,7 +58,7 @@ namespace Project
             return latestData;
         }
 
-        // --- 경고 로그를 DB에 기록하는 새로운 메서드 추가 ---
+        // --- 경고 로그를 DB에 기록하는 새로운 메서드 추가 --- 예시
         public void LogWarning(string warningType, float value, string message)
         {
             // 'warning_log' 테이블에 데이터를 삽입하는 SQL 쿼리

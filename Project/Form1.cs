@@ -14,6 +14,7 @@ namespace Project
     {
         private Timer _timer;
         private DatabaseManager _dbManager; // DB 전문가 (감시용)
+        private HardwareController _hardwareController; // 장비 전문가 (제어용)
 
         // --- 지능형 경고를 위한 카운터 ---
         private int _tempWarningCount = 0;
@@ -21,6 +22,13 @@ namespace Project
         private int _dustWarningCount = 0;
         private int _co2WarningCount = 0;
         private const int WARNING_THRESHOLD_COUNT = 3; // 3회 연속 이상이어야 경고!
+
+        // --- 경고 상태 지속 확인용 플래그 ---
+        private bool _isTempWarningActive = false;
+        private bool _isHumidityWarningActive = false;
+        private bool _isDustWarningActive = false;
+        private bool _isCo2WarningActive = false;
+
 
         // 모든 차트가 공유할 마스터 데이터 소스
         public ChartValues<double> TempValues { get; set; }
@@ -31,6 +39,16 @@ namespace Project
         public Form1()
         {
             InitializeComponent();
+
+            // 장비 전문가 고용
+            try
+            {
+                _hardwareController = new HardwareController("COM8", 115200);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("장비 제어 포트 연결 실패: " + ex.Message);
+            }
 
             // DB 전문가 고용
             try
@@ -58,21 +76,31 @@ namespace Project
             _timer.Start();
         }
 
-        // --- 모니터링 코드 (테스트용 가짜 데이터 생성) ---
-        private Random _random = new Random();
+        //// --- 모니터링 코드 (테스트용 가짜 데이터) ---
+        //private Random _random = new Random();
+        //private void Timer_Tick(object sender, EventArgs e)
+        //{
+        //    SensorData dummyData = new SensorData();
+        //    dummyData.Temperature = (float)(23 + (_random.NextDouble() - 0.5) * 3);
+        //    dummyData.Humidity = (float)(45 + (_random.NextDouble() - 0.5) * 20);
+        //    dummyData.Pm2_5 = (float)_random.Next(10, 50);
+        //    dummyData.Co2Ppm = (float)_random.Next(950, 1100);
+
+        //    UpdateCharts(dummyData);
+        //    UpdateStatusUI(dummyData);
+        //}
+
+        // --- 모니터링 코드 (테스트용 가짜 데이터) ---
+        //private Random _random = new Random();
         private void Timer_Tick(object sender, EventArgs e)
         {
-            // --- DB 읽는 부분 대신 가짜 데이터 생성 ---
-            SensorData dummyData = new SensorData();
-
-            // 랜덤 값 생성
-            dummyData.Temperature = (float)(23 + (_random.NextDouble() - 0.5) * 3);
-            dummyData.Humidity = (float)(45 + (_random.NextDouble() - 0.5) * 20);
-            dummyData.Pm2_5 = (float)_random.Next(10, 50);
-            dummyData.Co2Ppm = (float)_random.Next(950, 1100);
-
-            UpdateCharts(dummyData);
-            UpdateStatusUI(dummyData);
+            // 실제 DB에서 데이터 가져오기
+            SensorData data = _dbManager.GetLatestSensorData();
+            if (data != null)
+            {
+                UpdateCharts(data);
+                UpdateStatusUI(data);
+            }
         }
 
         private void UpdateCharts(SensorData data)
@@ -89,103 +117,94 @@ namespace Project
             while (CO2Values.Count > maxPoints) CO2Values.RemoveAt(0);
         }
 
-        // --- 지능형 경고 로직 UI 업데이트 코드 ---
+        // --- 지능형 경고 및 '자동 대응' 로직 ---
         private void UpdateStatusUI(SensorData data)
         {
             bool isAnyWarning = false;
 
-            // 1. 온도 상태 체크
-            if (data.Temperature.HasValue && (data.Temperature < 22.5 || data.Temperature > 23.5))
-            {
-                _tempWarningCount++; // 위반 카운트 증가
-            }
-            else
-            {
-                _tempWarningCount = 0; // 정상 범위면 카운트 리셋
-            }
-
+            // 1. 온도 상태 체크 및 자동 대응/기록
+            if (data.Temperature.HasValue && (data.Temperature < 22.5 || data.Temperature > 23.5)) { _tempWarningCount++; } else { _tempWarningCount = 0; }
             if (_tempWarningCount >= WARNING_THRESHOLD_COUNT)
             {
                 panel1.BackColor = System.Drawing.Color.IndianRed;
                 isAnyWarning = true;
+                _hardwareController?.TurnFanOn();
+                if (!_isTempWarningActive)
+                {
+                    _isTempWarningActive = true;
+                    string msg = data.Temperature < 22.5 ? "하한선 이탈" : "상한선 초과";
+                    _dbManager.LogWarning("온도 경고", data.Temperature.Value, msg);
+                }
             }
             else
             {
                 panel1.BackColor = SystemColors.Control;
+                if (_isTempWarningActive)
+                {
+                    _isTempWarningActive = false;
+                    _hardwareController?.TurnFanOff();
+                }
             }
 
             // 2. 습도 상태 체크
-            if (data.Humidity.HasValue && (data.Humidity < 40 || data.Humidity > 50))
-            {
-                _humidityWarningCount++;
-            }
-            else
-            {
-                _humidityWarningCount = 0;
-            }
-
+            if (data.Humidity.HasValue && (data.Humidity < 40 || data.Humidity > 50)) { _humidityWarningCount++; } else { _humidityWarningCount = 0; }
             if (_humidityWarningCount >= WARNING_THRESHOLD_COUNT)
             {
                 panel2.BackColor = System.Drawing.Color.IndianRed;
                 isAnyWarning = true;
+                if (!_isHumidityWarningActive)
+                {
+                    _isHumidityWarningActive = true;
+                    string msg = data.Humidity < 40 ? "하한선 이탈" : "상한선 초과";
+                    _dbManager.LogWarning("습도 경고", data.Humidity.Value, msg);
+                }
             }
             else
             {
                 panel2.BackColor = SystemColors.Control;
+                _isHumidityWarningActive = false;
             }
 
             // 3. 미세먼지 상태 체크
-            if (data.Pm2_5.HasValue && data.Pm2_5 >= 35)
-            {
-                _dustWarningCount++;
-            }
-            else
-            {
-                _dustWarningCount = 0;
-            }
-
+            if (data.Pm2_5.HasValue && data.Pm2_5 >= 35) { _dustWarningCount++; } else { _dustWarningCount = 0; }
             if (_dustWarningCount >= WARNING_THRESHOLD_COUNT)
             {
                 panel3.BackColor = System.Drawing.Color.IndianRed;
                 isAnyWarning = true;
+                if (!_isDustWarningActive)
+                {
+                    _isDustWarningActive = true;
+                    _dbManager.LogWarning("미세먼지 경고", data.Pm2_5.Value, "기준치 초과");
+                }
             }
             else
             {
                 panel3.BackColor = SystemColors.Control;
+                _isDustWarningActive = false;
             }
 
             // 4. 이산화탄소 상태 체크
-            if (data.Co2Ppm.HasValue && data.Co2Ppm >= 1000)
-            {
-                _co2WarningCount++;
-            }
-            else
-            {
-                _co2WarningCount = 0;
-            }
-
+            if (data.Co2Ppm.HasValue && data.Co2Ppm >= 1000) { _co2WarningCount++; } else { _co2WarningCount = 0; }
             if (_co2WarningCount >= WARNING_THRESHOLD_COUNT)
             {
                 panel4.BackColor = System.Drawing.Color.IndianRed;
                 isAnyWarning = true;
+                if (!_isCo2WarningActive)
+                {
+                    _isCo2WarningActive = true;
+                    _dbManager.LogWarning("CO2 경고", data.Co2Ppm.Value, "기준치 초과");
+                }
             }
             else
             {
                 panel4.BackColor = SystemColors.Control;
+                _isCo2WarningActive = false;
             }
 
-            // 하나라도 진짜 경고 상태이면 프로그램 제목 변경
-            if (isAnyWarning)
-            {
-                this.Text = "!! 경고 !! - 클린룸 통합 모니터링";
-            }
-            else
-            {
-                this.Text = "클린룸 통합 모니터링";
-            }
+            if (isAnyWarning) { this.Text = "!! 경고 !! - 클린룸 통합 모니터링"; } else { this.Text = "클린룸 통합 모니터링"; }
         }
 
-        // --- 이하 코드는 네가 준 버전과 동일 ---
+        // --- 이하 코드는 거의 변경 없음 ---
 
         private void InitializeAllCharts()
         {
@@ -257,6 +276,7 @@ namespace Project
             titleLabel.BringToFront();
         }
 
+        // --- '차트 타입 적용' 버튼 클릭 이벤트 핸들러 (수정됨) ---
         private void btnApplyChanges_Click(object sender, EventArgs e)
         {
             if (cmbTargetChart.SelectedItem == null)
@@ -265,11 +285,20 @@ namespace Project
                 return;
             }
             string selectedType = cmbTargetChart.SelectedItem.ToString();
+
+            // 상세 탭 차트들 변경
             ChangeChartType(chart_Detail_Temp, TempValues, "온도", selectedType);
             ChangeChartType(chart_Detail_Humidity, HumidityValues, "습도", selectedType);
             ChangeChartType(chart_Detail_Dust, DustValues, "미세먼지", selectedType);
             ChangeChartType(chart_Detail_CO2, CO2Values, "이산화탄소", selectedType);
-            MessageBox.Show($"상세 차트들이 {selectedType}로 변경되었습니다!");
+
+            // --- 종합 현황 탭 차트들도 함께 변경 (추가된 부분) ---
+            ChangeChartType(chart_Overall_Temp, TempValues, "온도", selectedType);
+            ChangeChartType(chart_Overall_Humidity, HumidityValues, "습도", selectedType);
+            ChangeChartType(chart_Overall_Dust, DustValues, "미세먼지", selectedType);
+            ChangeChartType(chart_Overall_CO2, CO2Values, "이산화탄소", selectedType);
+
+            MessageBox.Show($"모든 차트가 {selectedType}로 변경되었습니다!");
         }
 
         private void ChangeChartType(LiveCharts.WinForms.CartesianChart chart, ChartValues<double> values, string title, string chartType)
@@ -285,8 +314,25 @@ namespace Project
             chart.Series.Add(newSeries);
         }
 
+        // 폼이 닫힐 때 자원 정리
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            _hardwareController?.Dispose();
+        }
+
         private void cmbTargetChart_SelectedIndexChanged(object sender, EventArgs e) { }
         private void chart_Overall_CO2_ChildChanged(object sender, System.Windows.Forms.Integration.ChildChangedEventArgs e) { }
+
+        // 수동 제어 버튼 이벤트 핸들러 (UI에 버튼 추가 필요)
+        private void btnFanOn_Click(object sender, EventArgs e)
+        {
+            _hardwareController?.TurnFanOn();
+        }
+
+        private void btnFanOff_Click(object sender, EventArgs e)
+        {
+            _hardwareController?.TurnFanOff();
+        }
     }
 }
 
