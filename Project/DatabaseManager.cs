@@ -57,5 +57,34 @@ namespace Project
             }
             return latestData;
         }
+
+        // --- 경고 로그를 DB에 기록하는 새로운 메서드 추가 ---
+        public void LogWarning(string warningType, float value, string message)
+        {
+            // 'warning_log' 테이블에 데이터를 삽입하는 SQL 쿼리
+            string query = "INSERT INTO warning_log (warning_type, value, message) VALUES (@type, @val, @msg)";
+
+            try
+            {
+                using (var connection = new SQLiteConnection(connectionString))
+                {
+                    connection.Open();
+                    var command = new SQLiteCommand(query, connection);
+
+                    // SQL 인젝션 공격을 방지하기 위해 파라미터 사용
+                    command.Parameters.AddWithValue("@type", warningType);
+                    command.Parameters.AddWithValue("@val", value);
+                    command.Parameters.AddWithValue("@msg", message);
+
+                    // 쿼리 실행 (데이터를 읽어오는 게 아니므로 ExecuteNonQuery 사용)
+                    command.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                // UI를 멈추게 할 순 없으니, 콘솔에만 에러를 기록한다.
+                Console.WriteLine("경고 로그 기록 실패: " + ex.Message);
+            }
+        }
     }
 }
