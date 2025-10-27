@@ -62,7 +62,7 @@ namespace Project
 
             try
             {
-                _dbManager = new DatabaseManager("sensor_database.db"); // DB 연결 (디자이너에서는 실패)
+                _dbManager = new DatabaseManager(@"C:\BootcampProject\bootcamp-c-\Project\sensor_database.db"); // DB 연결 (디자이너에서는 실패)
             }
             catch (Exception ex)
             {
