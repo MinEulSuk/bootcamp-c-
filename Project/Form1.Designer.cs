@@ -174,7 +174,6 @@
             this.chart_Overall_CO2.Name = "chart_Overall_CO2";
             this.chart_Overall_CO2.Size = new System.Drawing.Size(387, 189);
             this.chart_Overall_CO2.TabIndex = 3;
-//            this.chart_Overall_CO2.ChildChanged += new System.EventHandler<System.Windows.Forms.Integration.ChildChangedEventArgs>(this.chart_Overall_CO2_ChildChanged);
             // 
             // tabPage_Temperature
             // 
@@ -295,7 +294,6 @@
             this.btnApplyChanges.TabIndex = 6;
             this.btnApplyChanges.Text = "적용";
             this.btnApplyChanges.UseVisualStyleBackColor = true;
-//            this.btnApplyChanges.Click += new System.EventHandler(this.btnApplyChanges_Click);
             // 
             // label1
             // 
@@ -305,7 +303,6 @@
             this.label1.Size = new System.Drawing.Size(69, 12);
             this.label1.TabIndex = 1;
             this.label1.Text = "그래프 설정";
-//            this.label1.Click += new System.EventHandler(this.label1_Click);
             // 
             // cmbTargetChart
             // 
@@ -319,7 +316,6 @@
             this.cmbTargetChart.Name = "cmbTargetChart";
             this.cmbTargetChart.Size = new System.Drawing.Size(181, 20);
             this.cmbTargetChart.TabIndex = 0;
-//            this.cmbTargetChart.SelectedIndexChanged += new System.EventHandler(this.cmbTargetChart_SelectedIndexChanged);
             // 
             // Form1
             // 
@@ -329,8 +325,7 @@
             this.Controls.Add(this.tabControl1);
             this.Name = "Form1";
             this.Text = "클린룸 통합 모니터링";
-//            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
-//            this.Load += new System.EventHandler(this.Form1_Load);
+            this.Load += new System.EventHandler(this.Form1_Load);
             this.tabControl1.ResumeLayout(false);
             this.tabPage_Overall.ResumeLayout(false);
             this.tableLayoutPanel1.ResumeLayout(false);
