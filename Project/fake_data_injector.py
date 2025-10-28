@@ -1,97 +1,63 @@
-import sqlite3
+# import serial  # (시리얼 통신 안 함)
+import mysql.connector # [수정] SQLite가 아닌 MySQL 드라이버
 import time
-import random
+import math
+import random 
 
-DB_FILE = 'sensor_database.db'
+# [수정] MySQL 서버에 접속
+db = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="1234",
+    database="sensor_project"
+)
+cursor = db.cursor()
 
-def create_table(conn):
-    """sensor_data 테이블이 없으면 생성"""
+print("MySQL 가짜 데이터 생성기 시작... (Ctrl+C로 중지)")
+print("아두이노 없이 MySQL에 1초마다 가짜 데이터를 삽입합니다.")
+
+while True:
     try:
-        cursor = conn.cursor()
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sensor_data (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-          Temperature REAL,
-          Humidity REAL,
-          Pm1_0 REAL,
-          Pm2_5 REAL,
-          Pm10 REAL,
-          Co2Ppm INTEGER
-        );
-        """)
+        # --- '가짜' 데이터를 여기서 직접 생성 ---
+        co2 = random.randint(400, 600)               # 정상 범위
+        temp = round(random.uniform(22.8, 23.2), 1) # 정상 범위
+        hum = round(random.uniform(42.0, 48.0), 1)   # 정상 범위
+        pm1 = round(random.uniform(1.0, 5.0), 1)   # (가짜 값)
+        pm25 = round(random.uniform(5.0, 15.0), 1)   # 정상 범위 (C#이 이 컬럼을 봄)
+        pm10 = round(random.uniform(10.0, 20.0), 1)  # (가짜 값)
+
+        # --- 경고 테스트용 데이터 (C# 패널 빨갛게 되는지 보려면 이걸로 바꿔) ---
+        # temp = 25.0  # 온도 경고
+        # hum = 60.0   # 습도 경고
+        # pm25 = 40.0 # 미세먼지 경고
+        # co2 = 1200   # CO2 경고
+        # ---
+
+        # [수정] MySQL용 INSERT 쿼리 (소문자 컬럼, %s 포맷)
+        sql = """INSERT INTO sensor_data
+                 (co2_ppm, temperature, humidity, pm1_0, pm2_5, pm10)
+                 VALUES (%s,%s,%s,%s,%s,%s)"""
         
-        # [중요] commands 테이블도 없으면 여기서 같이 만들어주자.
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS commands (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          command_text TEXT NOT NULL,
-          processed INTEGER DEFAULT 0,
-          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
-        
-        conn.commit()
-        print("DB 테이블 확인/생성 완료.")
-    except sqlite3.Error as e:
-        print(f"DB 테이블 생성 실패: {e}")
-    finally:
-        cursor.close()
+        cursor.execute(sql, (co2, temp, hum, pm1, pm25, pm10))
+        db.commit() # [수정] MySQL은 commit()이 필수
 
-def insert_fake_data(conn):
-    """DB에 가짜 센서 데이터를 한 줄 삽입"""
-    
-    # --- 여기서 가짜 데이터 생성 ---
-    # 경고 테스트하려면 이 범위를 벗어나게 값을 넣어봐
-    fake_temp = round(random.uniform(22.8, 23.2), 1) # 정상 범위
-    fake_hum = round(random.uniform(42.0, 48.0), 1)   # 정상 범위
-    fake_pm2_5 = round(random.uniform(5.0, 15.0), 1)   # 정상 범위
-    fake_co2 = random.randint(400, 600)               # 정상 범위
+        # 로그 이름 변경 (아까 스크린샷에서 본 이름)
+        print(f"데이터 삽입: T={temp}, H={hum}, Dust={pm25}, CO2={co2}")
 
-    # --- 경고 발생용 가짜 데이터 (이걸로 테스트해봐) ---
-    # fake_temp = 25.0  # 온도 경고
-    # fake_hum = 60.0   # 습도 경고
-    # fake_pm2_5 = 40.0 # 미세먼지 경고
-    # fake_co2 = 1200   # CO2 경고
-    
-    sql = """
-    INSERT INTO sensor_data (Temperature, Humidity, Pm2_5, Co2Ppm)
-    VALUES (?, ?, ?, ?)
-    """
-    
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (fake_temp, fake_hum, fake_pm2_5, fake_co2))
-        conn.commit()
-        print(f"데이터 삽입: T={fake_temp}, H={fake_hum}, Dust={fake_pm2_5}, CO2={fake_co2}")
-    except sqlite3.Error as e:
-        print(f"DB 에러: {e}") # 여기서 'file is not a database'가 떴던 것
-    finally:
-        cursor.close()
+        # 1초마다 실행
+        time.sleep(1)
 
-def main():
-    print("가짜 데이터 생성기 시작... (Ctrl+C로 중지)")
-    
-    try:
-        conn = sqlite3.connect(DB_FILE)
-    except sqlite3.Error as e:
-        print(f"DB 연결 실패: {e}")
-        return
+    except mysql.connector.Error as err:
+        # [수정] MySQL 에러 처리
+        print(f"MySQL 에러: {err}")
+        # (만약 'Access Denied'가 뜬다면 ALTER USER... 쿼리 실행)
+        time.sleep(1) 
+    except Exception as e:
+        print("기타 에러:", e)
+        time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n가짜 데이터 생성 중지.")
+        break
 
-    # --- [수정] ---
-    # 루프 시작 전에 테이블부터 확실하게 생성
-    create_table(conn)
-    # ---------------
-
-    while True:
-        try:
-            insert_fake_data(conn)
-            time.sleep(1) # C# 타이머와 동일하게 1초 대기
-        except KeyboardInterrupt:
-            print("\n가짜 데이터 생성 중지.")
-            break
-    
-    conn.close()
-
-if __name__ == "__main__":
-    main()
+cursor.close()
+db.close()
