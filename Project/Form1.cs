@@ -7,35 +7,36 @@ using System.Linq;
 using System.Windows.Forms;
 using System.Windows.Media;
 using Brushes = System.Windows.Media.Brushes;
-using System.ComponentModel; // LicenseManager 사용
+using System.ComponentModel;
+using LiveCharts.Defaults;
+using LiveCharts.Configurations;
 
 namespace Project
 {
     public partial class Form1 : Form
     {
         private Timer _timer;
-        private DatabaseManager _dbManager; // DB 전문가 (감시용)
+        private DatabaseManager _dbManager;
 
-        // HardwareController는 주석 처리 (그대로)
-        // private HardwareController _hardwareController; 
-
-        // --- 경고 카운터 및 플래그 (그대로) ---
-        private int _tempWarningCount = 0;
-        private int _humidityWarningCount = 0;
-        private int _dustWarningCount = 0;
-        private int _co2WarningCount = 0;
-        private const int WARNING_THRESHOLD_COUNT = 3;
+        private double _ewmaTemp = -999;
+        private double _ewmaHumidity = -999;
+        private double _ewmaDust = -999;
+        private double _ewmaCO2 = -999;
+        private const double EWMA_ALPHA = 0.3;
 
         private bool _isTempWarningActive = false;
         private bool _isHumidityWarningActive = false;
         private bool _isDustWarningActive = false;
         private bool _isCo2WarningActive = false;
 
-        // 마스터 데이터 소스
-        public ChartValues<double> TempValues { get; set; }
-        public ChartValues<double> HumidityValues { get; set; }
-        public ChartValues<double> DustValues { get; set; }
-        public ChartValues<double> CO2Values { get; set; }
+        public ChartValues<DateTimePoint> TempValues { get; set; }
+        public ChartValues<DateTimePoint> HumidityValues { get; set; }
+        public ChartValues<DateTimePoint> DustValues { get; set; }
+        public ChartValues<DateTimePoint> CO2Values { get; set; }
+
+        private int _maxChartPoints;
+        private int _currentIntervalSeconds = 1;
+        private int _currentMaxDurationSeconds = 30;
 
         public Form1()
         {
@@ -46,7 +47,6 @@ namespace Project
 
             try
             {
-                // [수정] 파일 경로 대신, MySQL 접속 정보가 내장된 새 DB 매니저 생성
                 _dbManager = new DatabaseManager();
             }
             catch (Exception ex)
@@ -55,22 +55,20 @@ namespace Project
                 Environment.Exit(1);
             }
 
-            // --- [수정] 누락되었던 초기화 코드 ---
+            TempValues = new ChartValues<DateTimePoint>();
+            HumidityValues = new ChartValues<DateTimePoint>();
+            DustValues = new ChartValues<DateTimePoint>();
+            CO2Values = new ChartValues<DateTimePoint>();
 
-            // 마스터 데이터 소스 초기화
-            TempValues = new ChartValues<double>();
-            HumidityValues = new ChartValues<double>();
-            DustValues = new ChartValues<double>();
-            CO2Values = new ChartValues<double>();
-
-            // 차트 초기 설정 (모든 탭)
+            InitializeChartMappers();
             InitializeAllCharts();
 
-            // 타이머 시작 (1초마다 DB 조회)
-            _timer = new Timer { Interval = 1000 };
+            _timer = new Timer();
+            _timer.Interval = _currentIntervalSeconds * 1000;
+            ApplyChartSettings(30);
+
             _timer.Tick += Timer_Tick;
             _timer.Start();
-            // --- 여기까지 ---
         }
 
         private void Timer_Tick(object sender, EventArgs e)
@@ -80,52 +78,53 @@ namespace Project
             SensorData data = _dbManager.GetLatestSensorData();
             if (data != null)
             {
-                UpdateCharts(data);
-                UpdateStatusUI(data);
+                DateTime now = DateTime.Now;
+                UpdateCharts(data, now);
+                UpdateStatusUI(data, now);
             }
+
+            UpdateAxisLimits();
         }
 
-        private void UpdateCharts(SensorData data)
+        private void UpdateCharts(SensorData data, DateTime now)
         {
-            // 차트에 값을 추가하기 전에 null 체크
-            if (data.Temperature.HasValue) TempValues.Add(Convert.ToDouble(data.Temperature.Value));
-            if (data.Humidity.HasValue) HumidityValues.Add(Convert.ToDouble(data.Humidity.Value));
-            if (data.Pm2_5.HasValue) DustValues.Add(Convert.ToDouble(data.Pm2_5.Value));
-            if (data.Co2Ppm.HasValue) CO2Values.Add(Convert.ToDouble(data.Co2Ppm.Value));
+            if (data.Temperature.HasValue) TempValues.Add(new DateTimePoint(now, Convert.ToDouble(data.Temperature.Value)));
+            if (data.Humidity.HasValue) HumidityValues.Add(new DateTimePoint(now, Convert.ToDouble(data.Humidity.Value)));
+            if (data.Pm2_5.HasValue) DustValues.Add(new DateTimePoint(now, Convert.ToDouble(data.Pm2_5.Value)));
+            if (data.Co2Ppm.HasValue) CO2Values.Add(new DateTimePoint(now, Convert.ToDouble(data.Co2Ppm.Value)));
 
-            // 차트에 표시할 최대 데이터 포인트 수
-            int maxPoints = 30;
-            while (TempValues.Count > maxPoints) TempValues.RemoveAt(0);
-            while (HumidityValues.Count > maxPoints) HumidityValues.RemoveAt(0);
-            while (DustValues.Count > maxPoints) DustValues.RemoveAt(0);
-            while (CO2Values.Count > maxPoints) CO2Values.RemoveAt(0);
+            while (TempValues.Count > _maxChartPoints) TempValues.RemoveAt(0);
+            while (HumidityValues.Count > _maxChartPoints) HumidityValues.RemoveAt(0);
+            while (DustValues.Count > _maxChartPoints) DustValues.RemoveAt(0);
+            while (CO2Values.Count > _maxChartPoints) CO2Values.RemoveAt(0);
         }
 
-        private void UpdateStatusUI(SensorData data)
+        private void UpdateStatusUI(SensorData data, DateTime now)
         {
             bool isAnyWarning = false;
 
-            // [수정] 경고 로직 실행 전 null 체크
-            // --- 온도 경고 체크 ---
+            // EWMA 온도
             if (data.Temperature.HasValue)
             {
-                if (data.Temperature < 22.5 || data.Temperature > 23.5) { _tempWarningCount++; } else { _tempWarningCount = 0; }
+                double currentValue = Convert.ToDouble(data.Temperature.Value);
+                if (_ewmaTemp == -999) _ewmaTemp = currentValue;
+                else _ewmaTemp = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaTemp);
 
-                if (_tempWarningCount >= WARNING_THRESHOLD_COUNT)
+                if (_ewmaTemp < 22.5 || _ewmaTemp > 23.5)
                 {
                     panel1.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isTempWarningActive)
                     {
                         _isTempWarningActive = true;
-                        string msg = data.Temperature < 22.5 ? "하한선 이탈" : "상한선 초과";
-                        _dbManager.LogWarning("온도 경고", data.Temperature.Value, msg);
+                        string msg = _ewmaTemp < 22.5 ? "EWMA 하한선 이탈" : "EWMA 상한선 초과";
+                        _dbManager.LogWarning("온도 경고 (EWMA)", (float)_ewmaTemp, msg);
                         _dbManager?.LogCommand("FAN_ON");
                     }
                 }
                 else
                 {
-                    panel1.BackColor = SystemColors.Control;
+                    panel1.BackColor = System.Drawing.Color.White;
                     if (_isTempWarningActive)
                     {
                         _isTempWarningActive = false;
@@ -134,127 +133,277 @@ namespace Project
                 }
             }
 
-            // --- 습도 경고 체크 ---
+            // EWMA 습도
             if (data.Humidity.HasValue)
             {
-                if (data.Humidity < 40 || data.Humidity > 50) { _humidityWarningCount++; } else { _humidityWarningCount = 0; }
+                double currentValue = Convert.ToDouble(data.Humidity.Value);
+                if (_ewmaHumidity == -999) _ewmaHumidity = currentValue;
+                else _ewmaHumidity = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaHumidity);
 
-                if (_humidityWarningCount >= WARNING_THRESHOLD_COUNT)
+                if (_ewmaHumidity < 40 || _ewmaHumidity > 50)
                 {
                     panel2.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isHumidityWarningActive)
                     {
                         _isHumidityWarningActive = true;
-                        string msg = data.Humidity < 40 ? "하한선 이탈" : "상한선 초과";
-                        _dbManager.LogWarning("습도 경고", data.Humidity.Value, msg);
-                        // _dbManager?.LogCommand("HUMIDIFIER_ON");
+                        string msg = _ewmaHumidity < 40 ? "EWMA 하한선 이탈" : "EWMA 상한선 초과";
+                        _dbManager.LogWarning("습도 경고 (EWMA)", (float)_ewmaHumidity, msg);
                     }
                 }
                 else
                 {
-                    panel2.BackColor = SystemColors.Control;
-                    if (_isHumidityWarningActive)
-                    {
-                        _isHumidityWarningActive = false;
-                        // _dbManager?.LogCommand("HUMIDIFIER_OFF");
-                    }
+                    panel2.BackColor = System.Drawing.Color.White;
+                    if (_isHumidityWarningActive) _isHumidityWarningActive = false;
                 }
             }
 
-            // --- 미세먼지 경고 체크 ---
+            // EWMA 미세먼지
             if (data.Pm2_5.HasValue)
             {
-                if (data.Pm2_5 >= 35) { _dustWarningCount++; } else { _dustWarningCount = 0; }
+                double currentValue = Convert.ToDouble(data.Pm2_5.Value);
+                if (_ewmaDust == -999) _ewmaDust = currentValue;
+                else _ewmaDust = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaDust);
 
-                if (_dustWarningCount >= WARNING_THRESHOLD_COUNT)
+                if (_ewmaDust >= 35)
                 {
                     panel3.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isDustWarningActive)
                     {
                         _isDustWarningActive = true;
-                        _dbManager.LogWarning("미세먼지 경고", data.Pm2_5.Value, "기준치 초과");
-                        // _dbManager?.LogCommand("AIR_PURIFIER_ON");
+                        _dbManager.LogWarning("미세먼지 경고 (EWMA)", (float)_ewmaDust, "EWMA 기준치 초과");
                     }
                 }
                 else
                 {
-                    panel3.BackColor = SystemColors.Control;
-                    if (_isDustWarningActive)
-                    {
-                        _isDustWarningActive = false;
-                        // _dbManager?.LogCommand("AIR_PURIFIER_OFF");
-                    }
+                    panel3.BackColor = System.Drawing.Color.White;
+                    if (_isDustWarningActive) _isDustWarningActive = false;
                 }
             }
 
-            // --- CO2 경고 체크 ---
+            // EWMA CO2
             if (data.Co2Ppm.HasValue)
             {
-                if (data.Co2Ppm >= 1000) { _co2WarningCount++; } else { _co2WarningCount = 0; }
+                double currentValue = Convert.ToDouble(data.Co2Ppm.Value);
+                if (_ewmaCO2 == -999) _ewmaCO2 = currentValue;
+                else _ewmaCO2 = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaCO2);
 
-                if (_co2WarningCount >= WARNING_THRESHOLD_COUNT)
+                if (_ewmaCO2 >= 1000)
                 {
                     panel4.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isCo2WarningActive)
                     {
                         _isCo2WarningActive = true;
-                        _dbManager.LogWarning("CO2 경고", data.Co2Ppm.Value, "기준치 초과");
+                        _dbManager.LogWarning("CO2 경고 (EWMA)", (float)_ewmaCO2, "EWMA 기준치 초과");
                         _dbManager?.LogCommand("FAN_ON");
                     }
                 }
                 else
                 {
-                    panel4.BackColor = SystemColors.Control;
-                    if (_isCo2WarningActive)
-                    {
-                        _isCo2WarningActive = false;
-                        // _dbManager?.LogCommand("FAN_OFF");
-                    }
+                    panel4.BackColor = System.Drawing.Color.White;
+                    if (_isCo2WarningActive) _isCo2WarningActive = false;
                 }
             }
 
-            this.Text = isAnyWarning ? "!! 경고 !! - 클린룸 통합 모니터링" : "클린룸 통합 모니터링";
+            string readableTime = "";
+            switch (_currentMaxDurationSeconds)
+            {
+                case 30:
+                    readableTime = "30초 보기";
+                    break;
+                case 60:
+                    readableTime = "1분 보기";
+                    break;
+                case 180:
+                    readableTime = "3분 보기";
+                    break;
+                case 600:
+                    readableTime = "10분 보기";
+                    break;
+                case 1800:
+                    readableTime = "30분 보기";
+                    break;
+                case 3600:
+                    readableTime = "1시간 보기";
+                    break;
+                default:
+                    readableTime = _currentMaxDurationSeconds + "초 보기";
+                    break;
+            }
+
+
+            string baseTitle = isAnyWarning ? "!! 경고 !! - 클린룸 통합 모니터링" : "클린룸 통합 모니터링";
+            this.Text = $"{baseTitle} - [{readableTime}]";
+        }
+
+        private void InitializeChartMappers()
+        {
+            var mapper = Mappers.Xy<DateTimePoint>()
+                .X(model => model.DateTime.Ticks)
+                .Y(model => model.Value);
+            Charting.For<DateTimePoint>(mapper);
+        }
+
+        private Axis CreateStyledYAxis(string title)
+        {
+            return new Axis
+            {
+                Title = title,
+                Foreground = Brushes.Gray,
+                FontSize = 11,
+                Separator = new Separator
+                {
+                    Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 220, 220)),
+                    StrokeThickness = 0.5
+                }
+            };
         }
 
         private void InitializeAllCharts()
         {
-            // '종합' 탭 차트 연결 (기존)
-            chart_Overall_Temp.Series = new SeriesCollection { new LineSeries { Title = "온도", Values = TempValues, PointGeometry = null } };
-            chart_Overall_Humidity.Series = new SeriesCollection { new LineSeries { Title = "습도", Values = HumidityValues, PointGeometry = null } };
-            chart_Overall_Dust.Series = new SeriesCollection { new LineSeries { Title = "미세먼지", Values = DustValues, PointGeometry = null } };
-            chart_Overall_CO2.Series = new SeriesCollection { new LineSeries { Title = "이산화탄소", Values = CO2Values, PointGeometry = null } };
+            var transparentRed = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 0, 0));
 
-            // --- [수정] '상세' 탭 차트들을 "실제 이름"으로 "똑같은" 데이터 소스에 연결 ---
+            var tempSections = new SectionsCollection
+            {
+                new AxisSection { Value = 23.5, SectionWidth = 100, Fill = transparentRed },
+                new AxisSection { Value = -100, SectionWidth = 122.5, Fill = transparentRed }
+            };
+            var humSections = new SectionsCollection
+            {
+                new AxisSection { Value = 50, SectionWidth = 100, Fill = transparentRed },
+                new AxisSection { Value = -100, SectionWidth = 140, Fill = transparentRed }
+            };
+            var dustSections = new SectionsCollection
+            {
+                new AxisSection { Value = 35, SectionWidth = 1000, Fill = transparentRed }
+            };
+            var co2Sections = new SectionsCollection
+            {
+                new AxisSection { Value = 1000, SectionWidth = 10000, Fill = transparentRed }
+            };
+
+            // X축 시간 라벨 제거
+            var xAxis = new Axis
+            {
+                Title = "",
+                Labels = null,
+                LabelFormatter = null,
+                ShowLabels = false
+            };
+
+            Action<LiveCharts.WinForms.CartesianChart, ChartValues<DateTimePoint>, string, Axis, double[]> setupChart =
+                (chart, values, title, yAxis, thresholds) =>
+                {
+                    var series = new SeriesCollection
+                    {
+                        new LineSeries
+                        {
+                            Title = title,
+                            Values = values,
+                            PointGeometry = null,
+                            StrokeThickness = 1.5,
+                            Fill = Brushes.Transparent,
+                            Stroke = Brushes.DodgerBlue
+                        }
+                    };
+
+                    // 기준선들 (고정 표시)
+                    foreach (var t in thresholds)
+                    {
+                        series.Add(new LineSeries
+                        {
+                            Title = $"기준선 ({t})",
+                            Values = new ChartValues<DateTimePoint>
+                            {
+                                new DateTimePoint(DateTime.Now.AddHours(-1), t),
+                                new DateTimePoint(DateTime.Now.AddHours(1), t)
+                            },
+                            Stroke = Brushes.IndianRed,
+                            Fill = Brushes.Transparent,
+                            StrokeDashArray = new DoubleCollection { 4 },
+                            StrokeThickness = 1
+                        });
+                    }
+
+                    chart.Series = series;
+                    chart.AxisX.Clear();
+                    chart.AxisY.Clear();
+                    chart.AxisX.Add(xAxis);
+                    chart.AxisY.Add(yAxis);
+                    chart.LegendLocation = LegendLocation.Bottom;
+                    chart.DisableAnimations = true;
+                    chart.Hoverable = false;
+                    chart.DataTooltip = null;
+                };
+
+            setupChart(chart_Overall_Temp, TempValues, "온도", CreateStyledYAxis("온도 (°C)"), new double[] { 22.5, 23.5 });
+            setupChart(chart_Overall_Humidity, HumidityValues, "습도", CreateStyledYAxis("습도 (%)"), new double[] { 40, 50 });
+            setupChart(chart_Overall_Dust, DustValues, "미세먼지", CreateStyledYAxis("PM2.5 (μg/m³)"), new double[] { 35 });
+            setupChart(chart_Overall_CO2, CO2Values, "이산화탄소", CreateStyledYAxis("CO2 (ppm)"), new double[] { 1000 });
 
             try
             {
-                // 스크린샷에서 확인한 실제 이름
-                chart_Detail_Temp.Series = new SeriesCollection { new LineSeries { Title = "온도", Values = TempValues, PointGeometry = null } };
-                chart_Detail_Humidity.Series = new SeriesCollection { new LineSeries { Title = "습도", Values = HumidityValues, PointGeometry = null } };
-                chart_Detail_Dust.Series = new SeriesCollection { new LineSeries { Title = "미세먼지", Values = DustValues, PointGeometry = null } };
-                chart_Detail_CO2.Series = new SeriesCollection { new LineSeries { Title = "이산화탄소", Values = CO2Values, PointGeometry = null } };
+                setupChart(chart_Detail_Temp, TempValues, "온도", CreateStyledYAxis("온도 (°C)"), new double[] { 22.5, 23.5 });
+                setupChart(chart_Detail_Humidity, HumidityValues, "습도", CreateStyledYAxis("습도 (%)"), new double[] { 40, 50 });
+                setupChart(chart_Detail_Dust, DustValues, "미세먼지", CreateStyledYAxis("PM2.5 (μg/m³)"), new double[] { 35 });
+                setupChart(chart_Detail_CO2, CO2Values, "이산화탄소", CreateStyledYAxis("CO2 (ppm)"), new double[] { 1000 });
             }
             catch (Exception ex)
             {
-                // 이름이 정확하다면 이 에러는 안 뜸
-                Console.WriteLine("상세 차트 연결 실패 (이름이 다를 수 있음): " + ex.Message);
+                Console.WriteLine("상세 차트 연결 실패: " + ex.Message);
             }
         }
 
-        // 폼 종료 시
-        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        private void UpdateAxisLimits()
         {
-            // HardwareController Dispose 로직 주석 처리 (그대로)
-            // _hardwareController?.Dispose();
+            if (_timer == null || !_timer.Enabled) return;
+
+            DateTime now = DateTime.Now;
+            DateTime startTime = now.AddSeconds(-_currentMaxDurationSeconds);
+
+            Action<Axis> setAxisLimits = (axis) =>
+            {
+                axis.MaxValue = now.Ticks;
+                axis.MinValue = startTime.Ticks;
+            };
+
+            setAxisLimits(chart_Overall_Temp.AxisX[0]);
+            setAxisLimits(chart_Overall_Humidity.AxisX[0]);
+            setAxisLimits(chart_Overall_Dust.AxisX[0]);
+            setAxisLimits(chart_Overall_CO2.AxisX[0]);
+
+            try
+            {
+                setAxisLimits(chart_Detail_Temp.AxisX[0]);
+                setAxisLimits(chart_Detail_Humidity.AxisX[0]);
+                setAxisLimits(chart_Detail_Dust.AxisX[0]);
+                setAxisLimits(chart_Detail_CO2.AxisX[0]);
+            }
+            catch { }
         }
 
-        private void Form1_Load(object sender, EventArgs e)
+        private void ApplyChartSettings(int newMaxDurationSeconds)
         {
+            if (_timer == null) return;
 
+            _currentMaxDurationSeconds = newMaxDurationSeconds;
+            _maxChartPoints = newMaxDurationSeconds / _currentIntervalSeconds;
+
+            while (TempValues.Count > _maxChartPoints) TempValues.RemoveAt(0);
+            while (HumidityValues.Count > _maxChartPoints) HumidityValues.RemoveAt(0);
+            while (DustValues.Count > _maxChartPoints) DustValues.RemoveAt(0);
+            while (CO2Values.Count > _maxChartPoints) CO2Values.RemoveAt(0);
+
+            UpdateAxisLimits();
         }
+
+        private void btnSet30s_Click(object sender, EventArgs e) => ApplyChartSettings(30);
+        private void btnSet60s_Click(object sender, EventArgs e) => ApplyChartSettings(60);
+        private void btnSet180s_Click(object sender, EventArgs e) => ApplyChartSettings(180);
+        private void btnSet600s_Click(object sender, EventArgs e) => ApplyChartSettings(600);
+        private void btnSet1800s_Click(object sender, EventArgs e) => ApplyChartSettings(1800);
+        private void btnSet3600s_Click(object sender, EventArgs e) => ApplyChartSettings(3600);
     }
 }
-
