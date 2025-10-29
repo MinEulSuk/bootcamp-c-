@@ -117,9 +117,10 @@ namespace Project
                     if (!_isTempWarningActive)
                     {
                         _isTempWarningActive = true;
-                        string msg = _ewmaTemp < 22.5 ? "EWMA 하한선 이탈" : "EWMA 상한선 초과";
-                        _dbManager.LogWarning("온도 경고 (EWMA)", (float)_ewmaTemp, msg);
-                        _dbManager?.LogCommand("FAN_ON");
+                        // ★ 수정: 새 메서드 호출 (메시지 포함)
+                        string msg = _ewmaTemp < 22.5 ? "온도 하한선 이탈 (EWMA)" : "온도 상한선 초과 (EWMA)";
+                        _dbManager.LogOutlierData(data, msg);
+                        // _dbManager?.LogCommand("FAN_ON"); // 제거
                     }
                 }
                 else
@@ -128,7 +129,7 @@ namespace Project
                     if (_isTempWarningActive)
                     {
                         _isTempWarningActive = false;
-                        _dbManager?.LogCommand("FAN_OFF");
+                        // _dbManager?.LogCommand("FAN_OFF"); // 제거
                     }
                 }
             }
@@ -147,8 +148,9 @@ namespace Project
                     if (!_isHumidityWarningActive)
                     {
                         _isHumidityWarningActive = true;
-                        string msg = _ewmaHumidity < 40 ? "EWMA 하한선 이탈" : "EWMA 상한선 초과";
-                        _dbManager.LogWarning("습도 경고 (EWMA)", (float)_ewmaHumidity, msg);
+                        // ★ 수정: 새 메서드 호출
+                        string msg = _ewmaHumidity < 40 ? "습도 하한선 이탈 (EWMA)" : "습도 상한선 초과 (EWMA)";
+                        _dbManager.LogOutlierData(data, msg);
                     }
                 }
                 else
@@ -165,6 +167,7 @@ namespace Project
                 if (_ewmaDust == -999) _ewmaDust = currentValue;
                 else _ewmaDust = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaDust);
 
+                // ★ 참고: 미세먼지(PM2.5) 경고 기준은 Pm2_5.Value를 사용합니다.
                 if (_ewmaDust >= 35)
                 {
                     panel3.BackColor = System.Drawing.Color.IndianRed;
@@ -172,7 +175,8 @@ namespace Project
                     if (!_isDustWarningActive)
                     {
                         _isDustWarningActive = true;
-                        _dbManager.LogWarning("미세먼지 경고 (EWMA)", (float)_ewmaDust, "EWMA 기준치 초과");
+                        // ★ 수정: 새 메서드 호출
+                        _dbManager.LogOutlierData(data, "미세먼지 기준치 초과 (EWMA)");
                     }
                 }
                 else
@@ -196,8 +200,9 @@ namespace Project
                     if (!_isCo2WarningActive)
                     {
                         _isCo2WarningActive = true;
-                        _dbManager.LogWarning("CO2 경고 (EWMA)", (float)_ewmaCO2, "EWMA 기준치 초과");
-                        _dbManager?.LogCommand("FAN_ON");
+                        // ★ 수정: 새 메서드 호출
+                        _dbManager.LogOutlierData(data, "CO2 기준치 초과 (EWMA)");
+                        // _dbManager?.LogCommand("FAN_ON"); // 제거
                     }
                 }
                 else
@@ -207,6 +212,7 @@ namespace Project
                 }
             }
 
+            // --- (이하 창 제목 업데이트 로직은 동일) ---
             string readableTime = "";
             switch (_currentMaxDurationSeconds)
             {

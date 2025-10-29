@@ -14,7 +14,13 @@ namespace Project
         public float? Co2Ppm { get; set; }
         public float? Temperature { get; set; }
         public float? Humidity { get; set; }
-        public float? Pm2_5 { get; set; }
+
+        // --- [수정] ---
+        public float? Pm1_0 { get; set; }   // pm1_0 값을 담기 위해 추가
+        public float? Pm2_5 { get; set; }   // (기존)
+        public float? Pm10 { get; set; }    // pm10 값을 담기 위해 추가
+        // --------------
+
         public string Status { get; set; } // '정상', '경고' 상태
     }
 }
