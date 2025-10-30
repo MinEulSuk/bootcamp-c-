@@ -18,11 +18,22 @@ namespace Project
         private Timer _timer;
         private DatabaseManager _dbManager;
 
-        private double _ewmaTemp = -999;
-        private double _ewmaHumidity = -999;
-        private double _ewmaDust = -999;
-        private double _ewmaCO2 = -999;
-        private const double EWMA_ALPHA = 0.3;
+        // --- ▼ [수정] EWMA 관련 필드 제거 ---
+        // private double _ewmaTemp = -999;
+        // ... (ewmaHumidity, ewmaDust, ewmaCO2)
+        // --- ▲ [수정] EWMA 관련 필드 제거 ---
+
+        // --- ▼ 설정값 필드 ---
+        // --- [수정] EWMA 설정 필드 제거 ---
+        // private bool _showEwma = false;
+        // private double _ewmaAlpha = 0.3;
+        private float _co2Threshold = 1700;
+        private float _tempMin = 18;
+        private float _tempMax = 26;
+        private float _humidityMin = 30;
+        private float _humidityMax = 75;
+        private float _pm25Threshold = 10;
+        // --- ▲ 설정값 필드 ---
 
         private bool _isTempWarningActive = false;
         private bool _isHumidityWarningActive = false;
@@ -33,6 +44,11 @@ namespace Project
         public ChartValues<DateTimePoint> HumidityValues { get; set; }
         public ChartValues<DateTimePoint> DustValues { get; set; }
         public ChartValues<DateTimePoint> CO2Values { get; set; }
+
+        // --- ▼ [수정] EWMA 차트 값 제거 ---
+        // public ChartValues<DateTimePoint> EwmaTempValues { get; set; }
+        // ... (EwmaHumidityValues, EwmaDustValues, EwmaCO2Values)
+        // --- ▲ [수정] EWMA 차트 값 제거 ---
 
         private int _maxChartPoints;
         private int _currentIntervalSeconds = 1;
@@ -60,16 +76,126 @@ namespace Project
             DustValues = new ChartValues<DateTimePoint>();
             CO2Values = new ChartValues<DateTimePoint>();
 
+            // --- [수정] EWMA 차트 값 초기화 제거 ---
+
             InitializeChartMappers();
-            InitializeAllCharts();
+
+            // 설정 탭 UI에 기본값 로드 및 이벤트 연결
+            LoadSettingsToUI();
+            try
+            {
+                // [수정] trackBarAlpha 이벤트 연결 제거
+                if (this.btnApplySettings != null)
+                {
+                    this.btnApplySettings.Click += new System.EventHandler(this.btnApplySettings_Click);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("설정 탭 컨트롤이 Form1.Designer.cs에 추가되었는지 확인하세요.\n" + ex.Message);
+            }
+
 
             _timer = new Timer();
             _timer.Interval = _currentIntervalSeconds * 1000;
-            ApplyChartSettings(30);
-
             _timer.Tick += Timer_Tick;
             _timer.Start();
         }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
+                return;
+
+            InitializeAllCharts();
+            ApplyChartSettings(30);
+        }
+
+        // --- ▼ 설정 UI 관련 메서드 ---
+
+        /// <summary>
+        /// 현재 설정 필드 값을 설정 탭의 UI 컨트롤에 로드합니다.
+        /// </summary>
+        private void LoadSettingsToUI()
+        {
+            try
+            {
+                // --- [수정] EWMA 컨트롤 로직 제거 ---
+                // if (chkShowEwma != null)
+                //    chkShowEwma.Checked = _showEwma;
+                // if (trackBarAlpha != null)
+                // ...
+                // if (lblAlphaValue != null)
+                // ...
+                // --- ▲ [수정] ---
+
+                if (numCo2 != null)
+                    numCo2.Value = (decimal)_co2Threshold;
+
+                if (numTempMin != null)
+                    numTempMin.Value = (decimal)_tempMin;
+
+                if (numTempMax != null)
+                    numTempMax.Value = (decimal)_tempMax;
+
+                if (numHumidityMin != null)
+                    numHumidityMin.Value = (decimal)_humidityMin;
+
+                if (numHumidityMax != null)
+                    numHumidityMax.Value = (decimal)_humidityMax;
+
+                if (numPm25 != null)
+                    numPm25.Value = (decimal)_pm25Threshold;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("설정 UI 로드 실패: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// "설정 적용" 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private void btnApplySettings_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // UI 컨트롤의 값을 private 필드로 저장
+                // --- [수정] EWMA 컨트롤 로직 제거 ---
+                // _showEwma = chkShowEwma.Checked;
+                // _ewmaAlpha = trackBarAlpha.Value / 100.0;
+                // --- ▲ [수정] ---
+
+                if (numCo2 != null)
+                    _co2Threshold = (float)numCo2.Value;
+                if (numTempMin != null)
+                    _tempMin = (float)numTempMin.Value;
+                if (numTempMax != null)
+                    _tempMax = (float)numTempMax.Value;
+                if (numHumidityMin != null)
+                    _humidityMin = (float)numHumidityMin.Value;
+                if (numHumidityMax != null)
+                    _humidityMax = (float)numHumidityMax.Value;
+                if (numPm25 != null)
+                    _pm25Threshold = (float)numPm25.Value;
+
+                // 변경된 설정을 차트에 즉시 반영 (임계선)
+                InitializeAllCharts();
+
+                MessageBox.Show("설정이 적용되었습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("설정 적용 실패: " + ex.Message, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // --- [수정] trackBarAlpha_Scroll 메서드 제거 ---
+
+        // --- ▲ 설정 UI 관련 메서드 ---
+
 
         private void Timer_Tick(object sender, EventArgs e)
         {
@@ -79,8 +205,9 @@ namespace Project
             if (data != null)
             {
                 DateTime now = DateTime.Now;
-                UpdateCharts(data, now);
+                // [수정] UpdateStatusUI가 먼저 호출되도록 순서 유지 (경고 판단)
                 UpdateStatusUI(data, now);
+                UpdateCharts(data, now);
             }
 
             UpdateAxisLimits();
@@ -93,126 +220,122 @@ namespace Project
             if (data.Pm2_5.HasValue) DustValues.Add(new DateTimePoint(now, Convert.ToDouble(data.Pm2_5.Value)));
             if (data.Co2Ppm.HasValue) CO2Values.Add(new DateTimePoint(now, Convert.ToDouble(data.Co2Ppm.Value)));
 
+            // --- [수정] EWMA 값 차트 데이터에 추가 로직 제거 ---
+
+            // 원본 데이터 정리
             while (TempValues.Count > _maxChartPoints) TempValues.RemoveAt(0);
             while (HumidityValues.Count > _maxChartPoints) HumidityValues.RemoveAt(0);
             while (DustValues.Count > _maxChartPoints) DustValues.RemoveAt(0);
             while (CO2Values.Count > _maxChartPoints) CO2Values.RemoveAt(0);
+
+            // --- [수정] EWMA 데이터 정리 로직 제거 ---
         }
 
         private void UpdateStatusUI(SensorData data, DateTime now)
         {
             bool isAnyWarning = false;
 
-            // EWMA 온도
+            // [수정] 온도 (원본 값 기준)
             if (data.Temperature.HasValue)
             {
                 double currentValue = Convert.ToDouble(data.Temperature.Value);
-                if (_ewmaTemp == -999) _ewmaTemp = currentValue;
-                else _ewmaTemp = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaTemp);
+                // --- [수정] EWMA 계산 로직 제거 ---
 
-                if (_ewmaTemp < 22.5 || _ewmaTemp > 23.5)
+                if (currentValue < _tempMin || currentValue > _tempMax)
                 {
-                    panel1.BackColor = System.Drawing.Color.IndianRed;
+                    if (panel1 != null) panel1.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isTempWarningActive)
                     {
                         _isTempWarningActive = true;
-                        // ★ 수정: 새 메서드 호출 (메시지 포함)
-                        string msg = _ewmaTemp < 22.5 ? "온도 하한선 이탈 (EWMA)" : "온도 상한선 초과 (EWMA)";
-                        _dbManager.LogOutlierData(data, msg);
-                        // _dbManager?.LogCommand("FAN_ON"); // 제거
+                        string msg = currentValue < _tempMin ? "온도 하한선 이탈" : "온도 상한선 초과";
+                        _dbManager?.LogWarning("온도 경고", (float)currentValue, msg); // [수정] (EWMA) 제거
+                        _dbManager?.LogCommand("FAN_ON");
                     }
                 }
                 else
                 {
-                    panel1.BackColor = System.Drawing.Color.White;
+                    if (panel1 != null) panel1.BackColor = System.Drawing.Color.White;
                     if (_isTempWarningActive)
                     {
                         _isTempWarningActive = false;
-                        // _dbManager?.LogCommand("FAN_OFF"); // 제거
+                        _dbManager?.LogCommand("FAN_OFF");
                     }
                 }
             }
 
-            // EWMA 습도
+            // [수정] 습도 (원본 값 기준)
             if (data.Humidity.HasValue)
             {
                 double currentValue = Convert.ToDouble(data.Humidity.Value);
-                if (_ewmaHumidity == -999) _ewmaHumidity = currentValue;
-                else _ewmaHumidity = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaHumidity);
+                // --- [수정] EWMA 계산 로직 제거 ---
 
-                if (_ewmaHumidity < 40 || _ewmaHumidity > 50)
+                if (currentValue < _humidityMin || currentValue > _humidityMax)
                 {
-                    panel2.BackColor = System.Drawing.Color.IndianRed;
+                    if (panel2 != null) panel2.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isHumidityWarningActive)
                     {
                         _isHumidityWarningActive = true;
-                        // ★ 수정: 새 메서드 호출
-                        string msg = _ewmaHumidity < 40 ? "습도 하한선 이탈 (EWMA)" : "습도 상한선 초과 (EWMA)";
-                        _dbManager.LogOutlierData(data, msg);
+                        string msg = currentValue < _humidityMin ? "습도 하한선 이탈" : "습도 상한선 초과";
+                        _dbManager?.LogWarning("습도 경고", (float)currentValue, msg); // [수정] (EWMA) 제거
                     }
                 }
                 else
                 {
-                    panel2.BackColor = System.Drawing.Color.White;
+                    if (panel2 != null) panel2.BackColor = System.Drawing.Color.White;
                     if (_isHumidityWarningActive) _isHumidityWarningActive = false;
                 }
             }
 
-            // EWMA 미세먼지
+            // [수정] 미세먼지 (원본 값 기준)
             if (data.Pm2_5.HasValue)
             {
                 double currentValue = Convert.ToDouble(data.Pm2_5.Value);
-                if (_ewmaDust == -999) _ewmaDust = currentValue;
-                else _ewmaDust = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaDust);
+                // --- [수정] EWMA 계산 로직 제거 ---
 
-                // ★ 참고: 미세먼지(PM2.5) 경고 기준은 Pm2_5.Value를 사용합니다.
-                if (_ewmaDust >= 35)
+                if (currentValue >= _pm25Threshold)
                 {
-                    panel3.BackColor = System.Drawing.Color.IndianRed;
+                    if (panel3 != null) panel3.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isDustWarningActive)
                     {
                         _isDustWarningActive = true;
-                        // ★ 수정: 새 메서드 호출
-                        _dbManager.LogOutlierData(data, "미세먼지 기준치 초과 (EWMA)");
+                        _dbManager?.LogWarning("미세먼지 경고", (float)currentValue, "기준치 초과"); // [수정] (EWMA) 제거
                     }
                 }
                 else
                 {
-                    panel3.BackColor = System.Drawing.Color.White;
+                    if (panel3 != null) panel3.BackColor = System.Drawing.Color.White;
                     if (_isDustWarningActive) _isDustWarningActive = false;
                 }
             }
 
-            // EWMA CO2
+            // [수정] CO2 (원본 값 기준)
             if (data.Co2Ppm.HasValue)
             {
                 double currentValue = Convert.ToDouble(data.Co2Ppm.Value);
-                if (_ewmaCO2 == -999) _ewmaCO2 = currentValue;
-                else _ewmaCO2 = (EWMA_ALPHA * currentValue) + ((1 - EWMA_ALPHA) * _ewmaCO2);
+                // --- [수정] EWMA 계산 로직 제거 ---
 
-                if (_ewmaCO2 >= 1000)
+                if (currentValue >= _co2Threshold)
                 {
-                    panel4.BackColor = System.Drawing.Color.IndianRed;
+                    if (panel4 != null) panel4.BackColor = System.Drawing.Color.IndianRed;
                     isAnyWarning = true;
                     if (!_isCo2WarningActive)
                     {
                         _isCo2WarningActive = true;
-                        // ★ 수정: 새 메서드 호출
-                        _dbManager.LogOutlierData(data, "CO2 기준치 초과 (EWMA)");
-                        // _dbManager?.LogCommand("FAN_ON"); // 제거
+                        _dbManager?.LogWarning("CO2 경고", (float)currentValue, "기준치 초과"); // [수정] (EWMA) 제거
+                        _dbManager?.LogCommand("FAN_ON");
                     }
                 }
                 else
                 {
-                    panel4.BackColor = System.Drawing.Color.White;
+                    if (panel4 != null) panel4.BackColor = System.Drawing.Color.White;
                     if (_isCo2WarningActive) _isCo2WarningActive = false;
                 }
             }
 
-            // --- (이하 창 제목 업데이트 로직은 동일) ---
+            // ... (폼 타이틀 업데이트 로직은 동일) ...
             string readableTime = "";
             switch (_currentMaxDurationSeconds)
             {
@@ -269,28 +392,6 @@ namespace Project
 
         private void InitializeAllCharts()
         {
-            var transparentRed = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 0, 0));
-
-            var tempSections = new SectionsCollection
-            {
-                new AxisSection { Value = 23.5, SectionWidth = 100, Fill = transparentRed },
-                new AxisSection { Value = -100, SectionWidth = 122.5, Fill = transparentRed }
-            };
-            var humSections = new SectionsCollection
-            {
-                new AxisSection { Value = 50, SectionWidth = 100, Fill = transparentRed },
-                new AxisSection { Value = -100, SectionWidth = 140, Fill = transparentRed }
-            };
-            var dustSections = new SectionsCollection
-            {
-                new AxisSection { Value = 35, SectionWidth = 1000, Fill = transparentRed }
-            };
-            var co2Sections = new SectionsCollection
-            {
-                new AxisSection { Value = 1000, SectionWidth = 10000, Fill = transparentRed }
-            };
-
-            // X축 시간 라벨 제거
             var xAxis = new Axis
             {
                 Title = "",
@@ -299,9 +400,12 @@ namespace Project
                 ShowLabels = false
             };
 
+            // [수정] setupChart 람다에서 ewmaValues 파라미터 제거
             Action<LiveCharts.WinForms.CartesianChart, ChartValues<DateTimePoint>, string, Axis, double[]> setupChart =
                 (chart, values, title, yAxis, thresholds) =>
                 {
+                    if (chart == null) return;
+
                     var series = new SeriesCollection
                     {
                         new LineSeries
@@ -314,6 +418,8 @@ namespace Project
                             Stroke = Brushes.DodgerBlue
                         }
                     };
+
+                    // --- [수정] EWMA 시리즈 추가 로직 제거 ---
 
                     // 기준선들 (고정 표시)
                     foreach (var t in thresholds)
@@ -344,22 +450,16 @@ namespace Project
                     chart.DataTooltip = null;
                 };
 
-            setupChart(chart_Overall_Temp, TempValues, "온도", CreateStyledYAxis("온도 (°C)"), new double[] { 22.5, 23.5 });
-            setupChart(chart_Overall_Humidity, HumidityValues, "습도", CreateStyledYAxis("습도 (%)"), new double[] { 40, 50 });
-            setupChart(chart_Overall_Dust, DustValues, "미세먼지", CreateStyledYAxis("PM2.5 (μg/m³)"), new double[] { 35 });
-            setupChart(chart_Overall_CO2, CO2Values, "이산화탄소", CreateStyledYAxis("CO2 (ppm)"), new double[] { 1000 });
+            // [수정] setupChart 호출 시 EWMA 값 전달 제거
+            setupChart(chart_Overall_Temp, TempValues, "온도", CreateStyledYAxis("온도 (°C)"), new double[] { _tempMin, _tempMax });
+            setupChart(chart_Overall_Humidity, HumidityValues, "습도", CreateStyledYAxis("습도 (%)"), new double[] { _humidityMin, _humidityMax });
+            setupChart(chart_Overall_Dust, DustValues, "미세먼지", CreateStyledYAxis("PM2.5 (μg/m³)"), new double[] { _pm25Threshold });
+            setupChart(chart_Overall_CO2, CO2Values, "이산화탄소", CreateStyledYAxis("CO2 (ppm)"), new double[] { _co2Threshold });
 
-            try
-            {
-                setupChart(chart_Detail_Temp, TempValues, "온도", CreateStyledYAxis("온도 (°C)"), new double[] { 22.5, 23.5 });
-                setupChart(chart_Detail_Humidity, HumidityValues, "습도", CreateStyledYAxis("습도 (%)"), new double[] { 40, 50 });
-                setupChart(chart_Detail_Dust, DustValues, "미세먼지", CreateStyledYAxis("PM2.5 (μg/m³)"), new double[] { 35 });
-                setupChart(chart_Detail_CO2, CO2Values, "이산화탄소", CreateStyledYAxis("CO2 (ppm)"), new double[] { 1000 });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("상세 차트 연결 실패: " + ex.Message);
-            }
+            setupChart(chart_Detail_Temp, TempValues, "온도", CreateStyledYAxis("온도 (°C)"), new double[] { _tempMin, _tempMax });
+            setupChart(chart_Detail_Humidity, HumidityValues, "습도", CreateStyledYAxis("습도 (%)"), new double[] { _humidityMin, _humidityMax });
+            setupChart(chart_Detail_Dust, DustValues, "미세먼지", CreateStyledYAxis("PM2.5 (μg/m³)"), new double[] { _pm25Threshold });
+            setupChart(chart_Detail_CO2, CO2Values, "이산화탄소", CreateStyledYAxis("CO2 (ppm)"), new double[] { _co2Threshold });
         }
 
         private void UpdateAxisLimits()
@@ -375,19 +475,15 @@ namespace Project
                 axis.MinValue = startTime.Ticks;
             };
 
-            setAxisLimits(chart_Overall_Temp.AxisX[0]);
-            setAxisLimits(chart_Overall_Humidity.AxisX[0]);
-            setAxisLimits(chart_Overall_Dust.AxisX[0]);
-            setAxisLimits(chart_Overall_CO2.AxisX[0]);
+            if (chart_Overall_Temp?.AxisX?.Count > 0) setAxisLimits(chart_Overall_Temp.AxisX[0]);
+            if (chart_Overall_Humidity?.AxisX?.Count > 0) setAxisLimits(chart_Overall_Humidity.AxisX[0]);
+            if (chart_Overall_Dust?.AxisX?.Count > 0) setAxisLimits(chart_Overall_Dust.AxisX[0]);
+            if (chart_Overall_CO2?.AxisX?.Count > 0) setAxisLimits(chart_Overall_CO2.AxisX[0]);
 
-            try
-            {
-                setAxisLimits(chart_Detail_Temp.AxisX[0]);
-                setAxisLimits(chart_Detail_Humidity.AxisX[0]);
-                setAxisLimits(chart_Detail_Dust.AxisX[0]);
-                setAxisLimits(chart_Detail_CO2.AxisX[0]);
-            }
-            catch { }
+            if (chart_Detail_Temp?.AxisX?.Count > 0) setAxisLimits(chart_Detail_Temp.AxisX[0]);
+            if (chart_Detail_Humidity?.AxisX?.Count > 0) setAxisLimits(chart_Detail_Humidity.AxisX[0]);
+            if (chart_Detail_Dust?.AxisX?.Count > 0) setAxisLimits(chart_Detail_Dust.AxisX[0]);
+            if (chart_Detail_CO2?.AxisX?.Count > 0) setAxisLimits(chart_Detail_CO2.AxisX[0]);
         }
 
         private void ApplyChartSettings(int newMaxDurationSeconds)
@@ -401,6 +497,8 @@ namespace Project
             while (HumidityValues.Count > _maxChartPoints) HumidityValues.RemoveAt(0);
             while (DustValues.Count > _maxChartPoints) DustValues.RemoveAt(0);
             while (CO2Values.Count > _maxChartPoints) CO2Values.RemoveAt(0);
+
+            // --- [수정] EWMA 데이터 정리 로직 제거 ---
 
             UpdateAxisLimits();
         }
